@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [unreleased]
 
+### Fixed
+* #524 Restrict usage of timezone aware expire dates to Django projects with USE_TZ set to True.
+
 ## [1.4.1]
 
 ### Changed
