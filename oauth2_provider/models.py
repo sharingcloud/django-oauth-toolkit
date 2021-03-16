@@ -331,8 +331,7 @@ class AbstractAccessToken(models.Model):
         null=True,
         related_name="refreshed_access_token",
     )
-    token = models.CharField(
-        max_length=255,
+    token = models.TextField(
         unique=True,
     )
     id_token = models.OneToOneField(
@@ -432,7 +431,7 @@ class AbstractRefreshToken(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="%(app_label)s_%(class)s"
     )
-    token = models.CharField(max_length=255)
+    token = models.TextField()
     application = models.ForeignKey(oauth2_settings.APPLICATION_MODEL, on_delete=models.CASCADE)
     access_token = models.OneToOneField(
         oauth2_settings.ACCESS_TOKEN_MODEL,
