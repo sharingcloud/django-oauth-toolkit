@@ -637,6 +637,7 @@ def clear_expired():
     refresh_expire_at = None
     access_token_model = get_access_token_model()
     refresh_token_model = get_refresh_token_model()
+    id_token_model = get_id_token_model()
     grant_model = get_grant_model()
     REFRESH_TOKEN_EXPIRE_SECONDS = oauth2_settings.REFRESH_TOKEN_EXPIRE_SECONDS
     if REFRESH_TOKEN_EXPIRE_SECONDS:
@@ -666,10 +667,13 @@ def clear_expired():
             logger.info("refresh_expire_at is %s. No refresh tokens deleted.", refresh_expire_at)
 
         access_tokens = access_token_model.objects.filter(refresh_token__isnull=True, expires__lt=now)
+        id_tokens = id_token_model.objects.filter(expires__lt=now)
         grants = grant_model.objects.filter(expires__lt=now)
 
         logger.info("%s Expired access tokens to be deleted", access_tokens.count())
+        logger.info("%s Expired ID tokens to be deleted", id_tokens.count())
         logger.info("%s Expired grant tokens to be deleted", grants.count())
 
         access_tokens.delete()
+        id_tokens.delete()
         grants.delete()
