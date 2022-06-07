@@ -9,18 +9,22 @@ DEFAULT_SCOPES_RW = {"DEFAULT_SCOPES": ["read", "write"]}
 DEFAULT_SCOPES_RO = {"DEFAULT_SCOPES": ["read"]}
 OIDC_SETTINGS_RW = {
     "OIDC_ENABLED": True,
-    "OIDC_ISS_ENDPOINT": "http://localhost",
-    "OIDC_USERINFO_ENDPOINT": "http://localhost/userinfo/",
+    "OIDC_ISS_ENDPOINT": "http://localhost/o",
+    "OIDC_USERINFO_ENDPOINT": "http://localhost/o/userinfo/",
     "OIDC_RSA_PRIVATE_KEY": settings.OIDC_RSA_PRIVATE_KEY,
+    "OIDC_RSA_PRIVATE_KEYS_INACTIVE": settings.OIDC_RSA_PRIVATE_KEYS_INACTIVE,
     "SCOPES": {
         "read": "Reading scope",
         "write": "Writing scope",
         "openid": "OpenID connect",
     },
     "DEFAULT_SCOPES": ["read", "write"],
+    "PKCE_REQUIRED": False,
 }
 OIDC_SETTINGS_RO = deepcopy(OIDC_SETTINGS_RW)
 OIDC_SETTINGS_RO["DEFAULT_SCOPES"] = ["read"]
+OIDC_SETTINGS_EMAIL_SCOPE = deepcopy(OIDC_SETTINGS_RW)
+OIDC_SETTINGS_EMAIL_SCOPE["SCOPES"].update({"email": "return email address"})
 OIDC_SETTINGS_HS256_ONLY = deepcopy(OIDC_SETTINGS_RW)
 del OIDC_SETTINGS_HS256_ONLY["OIDC_RSA_PRIVATE_KEY"]
 REST_FRAMEWORK_SCOPES = {

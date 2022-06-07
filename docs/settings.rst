@@ -52,6 +52,11 @@ Default: ``["http", "https"]``
 A list of schemes that the ``redirect_uri`` field will be validated against.
 Setting this to ``["https"]`` only in production is strongly recommended.
 
+For Native Apps the ``http`` scheme can be safely used with loopback addresses in the
+Application (``[::1]`` or ``127.0.0.1``). In this case the ``redirect_uri`` can be
+configured without explicit port specification, so that the Application accepts randomly
+assigned ports.
+
 Note that you may override ``Application.get_allowed_schemes()`` to set this on
 a per-application basis.
 
@@ -92,19 +97,19 @@ of those three can be a callable) must be passed here directly and classes
 must be instantiated (callables should accept request as their only argument).
 
 GRANT_MODEL
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~
 The import string of the class (model) representing your grants. Overwrite
 this value if you wrote your own implementation (subclass of
 ``oauth2_provider.models.Grant``).
 
 APPLICATION_ADMIN_CLASS
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 The import string of the class (model) representing your application admin class.
 Overwrite this value if you wrote your own implementation (subclass of
 ``oauth2_provider.admin.ApplicationAdmin``).
 
 ACCESS_TOKEN_ADMIN_CLASS
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
 The import string of the class (model) representing your access token admin class.
 Overwrite this value if you wrote your own implementation (subclass of
 ``oauth2_provider.admin.AccessTokenAdmin``).
@@ -116,7 +121,7 @@ Overwrite this value if you wrote your own implementation (subclass of
 ``oauth2_provider.admin.GrantAdmin``).
 
 REFRESH_TOKEN_ADMIN_CLASS
-~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
 The import string of the class (model) representing your refresh token admin class.
 Overwrite this value if you wrote your own implementation (subclass of
 ``oauth2_provider.admin.RefreshTokenAdmin``).
@@ -142,12 +147,14 @@ REFRESH_TOKEN_EXPIRE_SECONDS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The number of seconds before a refresh token gets removed from the database by
 the ``cleartokens`` management command. Check :ref:`cleartokens` management command for further info.
+Can be an ``Int`` or ``datetime.timedelta``.
+
 NOTE: This value is completely ignored when validating refresh tokens.
 If you don't change the validator code and don't run cleartokens all refresh
 tokens will last until revoked or the end of time. You should change this.
 
 REFRESH_TOKEN_GRACE_PERIOD_SECONDS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The number of seconds between when a refresh token is first used when it is
 expired. The most common case of this for this is native mobile applications
 that run into issues of network connectivity during the refresh cycle and are
@@ -171,7 +178,7 @@ See also: validator's rotate_refresh_token method can be overridden to make this
 when close to expiration, theoretically).
 
 REFRESH_TOKEN_GENERATOR
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 See `ACCESS_TOKEN_GENERATOR`. This is the same but for refresh tokens.
 Defaults to access token generator if not provided.
 
@@ -246,9 +253,21 @@ will be used.
 
 PKCE_REQUIRED
 ~~~~~~~~~~~~~
-Default: ``False``
+Default: ``True``
 
-Whether or not PKCE is required. Can be either a bool or a callable that takes a client id and returns a bool.
+Can be either a bool or a callable that takes a client id and returns a bool.
+
+Whether or not `Proof Key for Code Exchange <https://oauth.net/2/pkce/>`_ is required.
+
+According to `OAuth 2.0 Security Best Current Practice <https://oauth.net/2/oauth-best-practice/>`_ related to the
+`Authorization Code Grant <https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics#section-2.1.>`_
+
+- Public clients MUST use PKCE `RFC7636 <https://datatracker.ietf.org/doc/html/rfc7636>`_
+- For confidential clients, the use of PKCE `RFC7636 <https://datatracker.ietf.org/doc/html/rfc7636>`_ is RECOMMENDED.
+
+
+
+
 
 
 OIDC_RSA_PRIVATE_KEY
@@ -257,6 +276,25 @@ Default: ``""``
 
 The RSA private key used to sign OIDC ID tokens. If not set, OIDC is disabled.
 
+OIDC_RSA_PRIVATE_KEYS_INACTIVE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Default: ``[]``
+
+An array of *inactive* RSA private keys. These keys are not used to sign tokens,
+but are published in the jwks_uri location.
+
+This is useful for providing a smooth transition during key rotation.
+``OIDC_RSA_PRIVATE_KEY`` can be replaced, and recently decommissioned keys
+should be retained in this inactive list.
+
+OIDC_JWKS_MAX_AGE_SECONDS
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Default: ``3600``
+
+The max-age value for the Cache-Control header on jwks_uri.
+
+This enables the verifier to safely cache the JWK Set and not have to re-download
+the document for every token.
 
 OIDC_USERINFO_ENDPOINT
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -311,11 +349,26 @@ Default: ``["client_secret_post", "client_secret_basic"]``
 
 The authentication methods that are advertised to be supported by this server.
 
+CLEAR_EXPIRED_TOKENS_BATCH_SIZE
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Default: ``10000``
+
+The size of delete batches used by ``cleartokens`` management command.
+
+CLEAR_EXPIRED_TOKENS_BATCH_INTERVAL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Default: ``0``
+
+Time of sleep in seconds used by ``cleartokens`` management command between batch deletions.
+
+Set this to a non-zero value (e.g. `0.1`) to add a pause between batch sizes to reduce system
+load when clearing large batches of expired tokens.
+
 
 Settings imported from Django project
---------------------------
+-------------------------------------
 
 USE_TZ
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
 
 Used to determine whether or not to make token expire dates timezone aware.

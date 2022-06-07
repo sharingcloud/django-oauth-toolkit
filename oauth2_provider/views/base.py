@@ -1,11 +1,11 @@
 import json
 import logging
-import urllib.parse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render
-from django.urls import reverse
+from django.contrib.auth.views import redirect_to_login
+from django.http import HttpResponse
+from django.shortcuts import resolve_url
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -147,6 +147,10 @@ class AuthorizationView(BaseAuthorizationView, FormView):
             # Application is not available at this time.
             return self.error_response(error, application=None)
 
+        prompt = request.GET.get("prompt")
+        if prompt == "login":
+            return self.handle_prompt_login()
+
         all_scopes = get_scopes_backend().get_all_scopes()
         kwargs["scopes_descriptions"] = [all_scopes[scope] for scope in scopes]
         kwargs["scopes"] = scopes
@@ -207,41 +211,38 @@ class AuthorizationView(BaseAuthorizationView, FormView):
                             credentials=credentials,
                             allow=True,
                         )
-                        return self.redirect(uri, application, token)
+                        return self.redirect(uri, application)
 
         except OAuthToolkitError as error:
             return self.error_response(error, application)
 
         return self.render_to_response(self.get_context_data(**kwargs))
 
-    def redirect(self, redirect_to, application, token=None):
+    def handle_prompt_login(self):
+        path = self.request.build_absolute_uri()
+        resolved_login_url = resolve_url(self.get_login_url())
 
-        if not redirect_to.startswith("urn:ietf:wg:oauth:2.0:oob"):
-            return super().redirect(redirect_to, application)
+        # If the login url is the same scheme and net location then use the
+        # path as the "next" url.
+        login_scheme, login_netloc = urlparse(resolved_login_url)[:2]
+        current_scheme, current_netloc = urlparse(path)[:2]
+        if (not login_scheme or login_scheme == current_scheme) and (
+            not login_netloc or login_netloc == current_netloc
+        ):
+            path = self.request.get_full_path()
 
-        parsed_redirect = urllib.parse.urlparse(redirect_to)
-        code = urllib.parse.parse_qs(parsed_redirect.query)["code"][0]
+        parsed = urlparse(path)
 
-        if redirect_to.startswith("urn:ietf:wg:oauth:2.0:oob:auto"):
+        parsed_query = dict(parse_qsl(parsed.query))
+        parsed_query.pop("prompt")
 
-            response = {
-                "access_token": code,
-                "token_uri": redirect_to,
-                "client_id": application.client_id,
-                "client_secret": application.client_secret,
-                "revoke_uri": reverse("oauth2_provider:revoke-token"),
-            }
+        parsed = parsed._replace(query=urlencode(parsed_query))
 
-            return JsonResponse(response)
-
-        else:
-            return render(
-                request=self.request,
-                template_name="oauth2_provider/authorized-oob.html",
-                context={
-                    "code": code,
-                },
-            )
+        return redirect_to_login(
+            parsed.geturl(),
+            resolved_login_url,
+            self.get_redirect_field_name(),
+        )
 
 
 @method_decorator(csrf_exempt, name="dispatch")
