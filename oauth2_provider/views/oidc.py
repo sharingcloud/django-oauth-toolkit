@@ -32,6 +32,7 @@ class ConnectDiscoveryInfoView(OIDCOnlyMixin, View):
             userinfo_endpoint = oauth2_settings.OIDC_USERINFO_ENDPOINT or request.build_absolute_uri(
                 reverse("oauth2_provider:user-info")
             )
+            end_session_endpoint = request.build_absolute_uri(reverse("oauth2_provider:end_session_endpoint"))
             jwks_uri = request.build_absolute_uri(reverse("oauth2_provider:jwks-info"))
         else:
             parsed_url = urlparse(oauth2_settings.OIDC_ISS_ENDPOINT)
@@ -41,6 +42,7 @@ class ConnectDiscoveryInfoView(OIDCOnlyMixin, View):
             userinfo_endpoint = oauth2_settings.OIDC_USERINFO_ENDPOINT or "{}{}".format(
                 host, reverse("oauth2_provider:user-info")
             )
+            end_session_endpoint = "{}{}".format(host, reverse("oauth2_provider:end_session_endpoint"))
             jwks_uri = "{}{}".format(host, reverse("oauth2_provider:jwks-info"))
 
         signing_algorithms = [Application.HS256_ALGORITHM]
@@ -67,6 +69,7 @@ class ConnectDiscoveryInfoView(OIDCOnlyMixin, View):
             "token_endpoint_auth_methods_supported": (
                 oauth2_settings.OIDC_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED
             ),
+            "end_session_endpoint": end_session_endpoint,
             "claims_supported": oidc_claims,
         }
         response = JsonResponse(data)

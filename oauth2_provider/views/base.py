@@ -1,11 +1,12 @@
 import json
 import logging
-from urllib.parse import parse_qsl, urlencode, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, unquote, ParseResult
 
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import redirect_to_login
-from django.http import HttpResponse
-from django.shortcuts import resolve_url
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
+from django.shortcuts import redirect, resolve_url
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -15,12 +16,12 @@ from django.views.generic import FormView, View
 from ..exceptions import OAuthToolkitError
 from ..forms import AllowForm
 from ..http import OAuth2ResponseRedirect
-from ..models import get_access_token_model, get_application_model
+from ..models import get_access_token_model, get_application_model, get_refresh_token_model
+from ..oauth2_validators import OAuth2Validator
 from ..scopes import get_scopes_backend
 from ..settings import oauth2_settings
-from ..signals import app_authorized
+from ..signals import app_authorized, oidc_session_ended
 from .mixins import OAuthLibMixin
-
 
 log = logging.getLogger("oauth2_provider")
 
@@ -284,3 +285,92 @@ class RevokeTokenView(OAuthLibMixin, View):
         for k, v in headers.items():
             response[k] = v
         return response
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class EndSessionView(OAuthLibMixin, View):
+    """
+    This end_session_endpoint view is mainly implemented to fit
+    our SaaS stack behaviour. Most of the spec will be omitted.
+    """
+
+    def get(self, request, *args, **kwargs):
+
+        redirect_uri = request.GET.get("post_logout_redirect_uri", None)
+        state = request.GET.get("state", None)
+        # we'll receive an access token
+        token_hint = request.GET.get("id_token_hint", None)
+        if not token_hint:
+            return HttpResponseBadRequest("missing id_token_hint")
+
+        id_token = OAuth2Validator()._load_id_token(token_hint)
+        if not id_token:
+            return HttpResponseNotFound("id_token_hint not found")
+
+        user = id_token.user or request.user
+        self.revoke_tokens(user, id_token)
+        oidc_session_ended.send(sender=self, request=request, id_token=id_token)
+
+        # state is an opaque value that will be passed as-is to the RP when
+        # redirecting user to the post logout redirect URI. If redirect URI
+        # is missing, this value will not be used.
+        if redirect_uri:
+            if state:
+                redirect_uri = self.add_url_params(redirect_uri, {"state": state})
+            return redirect(redirect_uri)
+
+        # else redirect to login url
+        return redirect(settings.LOGIN_URL)
+
+    def revoke_tokens(self, user, id_token):
+        access_tokens = get_access_token_model().objects.filter(user=user, id_token=id_token)
+        refresh_tokens = get_refresh_token_model().objects.filter(access_token__in=access_tokens)
+
+        removed_refresh_tokens_count = refresh_tokens.delete()
+        log.info("%s refresh tokens revoked", removed_refresh_tokens_count)
+
+        removed_access_tokens_count = access_tokens.delete()
+        log.info("%s accesss tokens revoked", removed_access_tokens_count)
+
+        id_token.delete()
+
+    def add_url_params(url, params):
+        """
+        Add GET params to provided URL being aware of existing.
+
+        :param url: string of target URL
+        :param params: dict containing requested params to be added
+        :return: string with updated URL
+
+        >> url = 'http://stackoverflow.com/test?answers=true'
+        >> new_params = {'answers': False, 'data': ['some','values']}
+        >> add_url_params(url, new_params)
+        'http://stackoverflow.com/test?data=some&data=values&answers=false'
+
+        Source: https://stackoverflow.com/a/25580545
+        """
+        # Unquoting URL first so we don't loose existing args
+        url = unquote(url)
+        # Extracting url info
+        parsed_url = urlparse(url)
+        # Extracting URL arguments from parsed URL
+        get_args = parsed_url.query
+        # Converting URL arguments to dict
+        parsed_get_args = dict(parse_qsl(get_args))
+        # Merging URL arguments dict with new params
+        parsed_get_args.update(params)
+
+        # Converting URL argument to proper query string
+        encoded_get_args = urlencode(parsed_get_args, doseq=True)
+        # Creating new parsed result object based on provided with new
+        # URL arguments. Same thing happens inside of urlparse.
+        new_url = ParseResult(
+            parsed_url.scheme,
+            parsed_url.netloc,
+            parsed_url.path,
+            parsed_url.params,
+            encoded_get_args,
+            parsed_url.fragment,
+        ).geturl()
+
+        return new_url
