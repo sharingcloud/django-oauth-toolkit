@@ -1,6 +1,7 @@
 import base64
 import binascii
 import http.client
+import inspect
 import json
 import logging
 import uuid
@@ -11,6 +12,7 @@ from urllib.parse import unquote_plus
 import requests
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.hashers import check_password
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Q
@@ -63,6 +65,34 @@ UserModel = get_user_model()
 
 
 class OAuth2Validator(RequestValidator):
+    # Return the given claim only if the given scope is present.
+    # Extended as needed for non-standard OIDC claims/scopes.
+    # Override by setting to None to ignore scopes.
+    # see https://openid.net/specs/openid-connect-core-1_0.html#ScopeClaims
+    # For example, for the "nickname" claim, you need the "profile" scope.
+    oidc_claim_scope = {
+        "sub": "openid",
+        "name": "profile",
+        "family_name": "profile",
+        "given_name": "profile",
+        "middle_name": "profile",
+        "nickname": "profile",
+        "preferred_username": "profile",
+        "profile": "profile",
+        "picture": "profile",
+        "website": "profile",
+        "gender": "profile",
+        "birthdate": "profile",
+        "zoneinfo": "profile",
+        "locale": "profile",
+        "updated_at": "profile",
+        "email": "email",
+        "email_verified": "email",
+        "address": "address",
+        "phone_number": "phone",
+        "phone_number_verified": "phone",
+    }
+
     def _extract_basic_auth(self, request):
         """
         Return authentication string if request contains basic auth credentials,
@@ -122,7 +152,7 @@ class OAuth2Validator(RequestValidator):
         elif request.client.client_id != client_id:
             log.debug("Failed basic auth: wrong client id %s" % client_id)
             return False
-        elif request.client.client_secret != client_secret:
+        elif not check_password(client_secret, request.client.client_secret):
             log.debug("Failed basic auth: wrong client secret %s" % client_secret)
             return False
         else:
@@ -147,7 +177,7 @@ class OAuth2Validator(RequestValidator):
         if self._load_application(client_id, request) is None:
             log.debug("Failed body auth: Application %s does not exists" % client_id)
             return False
-        elif request.client.client_secret != client_secret:
+        elif not check_password(client_secret, request.client.client_secret):
             log.debug("Failed body auth: wrong client secret %s" % client_secret)
             return False
         else:
@@ -395,7 +425,7 @@ class OAuth2Validator(RequestValidator):
         if access_token and access_token.is_valid(scopes):
             request.client = access_token.application
             request.user = access_token.user
-            request.scopes = scopes
+            request.scopes = list(access_token.scopes)
 
             # this is needed by django rest framework
             request.access_token = access_token
@@ -725,18 +755,43 @@ class OAuth2Validator(RequestValidator):
         )
         return id_token
 
+    @classmethod
+    def _get_additional_claims_is_request_agnostic(cls):
+        return len(inspect.signature(cls.get_additional_claims).parameters) == 1
+
     def get_jwt_bearer_token(self, token, token_handler, request):
         return self.get_id_token(token, token_handler, request)
 
-    def get_oidc_claims(self, token, token_handler, request):
-        # Required OIDC claims
-        claims = {
-            "sub": str(request.user.id),
-        }
+    def get_claim_dict(self, request):
+        if self._get_additional_claims_is_request_agnostic():
+            claims = {"sub": lambda r: str(r.user.id)}
+        else:
+            claims = {"sub": str(request.user.id)}
 
         # https://openid.net/specs/openid-connect-core-1_0.html#StandardClaims
-        claims.update(**self.get_additional_claims(request))
+        if self._get_additional_claims_is_request_agnostic():
+            add = self.get_additional_claims()
+        else:
+            add = self.get_additional_claims(request)
+        claims.update(add)
 
+        return claims
+
+    def get_discovery_claims(self, request):
+        claims = ["sub"]
+        if self._get_additional_claims_is_request_agnostic():
+            claims += list(self.get_claim_dict(request).keys())
+        return claims
+
+    def get_oidc_claims(self, token, token_handler, request):
+        data = self.get_claim_dict(request)
+        claims = {}
+
+        # TODO if request.claims then return only the claims requested, but limited by granted scopes.
+
+        for k, v in data.items():
+            if not self.oidc_claim_scope or self.oidc_claim_scope.get(k) in request.scopes:
+                claims[k] = v(request) if callable(v) else v
         return claims
 
     def get_id_token_dictionary(self, token, token_handler, request):
@@ -887,7 +942,7 @@ class OAuth2Validator(RequestValidator):
         current user's claims.
 
         """
-        return self.get_oidc_claims(None, None, request)
+        return self.get_oidc_claims(request.access_token, None, request)
 
     def get_additional_claims(self, request):
         return {}

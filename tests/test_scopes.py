@@ -18,6 +18,8 @@ AccessToken = get_access_token_model()
 Grant = get_grant_model()
 UserModel = get_user_model()
 
+CLEARTEXT_SECRET = "1234567890abcdefghijklmnopqrstuvwxyz"
+
 
 # mocking a protected resource view
 class ScopeResourceView(ScopedProtectedResourceView):
@@ -67,6 +69,7 @@ class BaseTest(TestCase):
             user=self.dev_user,
             client_type=Application.CLIENT_CONFIDENTIAL,
             authorization_grant_type=Application.GRANT_AUTHORIZATION_CODE,
+            client_secret=CLEARTEXT_SECRET,
         )
 
     def tearDown(self):
@@ -80,6 +83,7 @@ class TestScopesSave(BaseTest):
         """
         Test scopes are properly saved in grant
         """
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -102,6 +106,7 @@ class TestScopesSave(BaseTest):
         """
         Test scopes are properly saved in access token
         """
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -123,7 +128,7 @@ class TestScopesSave(BaseTest):
             "code": authorization_code,
             "redirect_uri": "http://example.org",
         }
-        auth_headers = get_basic_auth_header(self.application.client_id, self.application.client_secret)
+        auth_headers = get_basic_auth_header(self.application.client_id, CLEARTEXT_SECRET)
 
         response = self.client.post(reverse("oauth2_provider:token"), data=token_request_data, **auth_headers)
         content = json.loads(response.content.decode("utf-8"))
@@ -138,6 +143,7 @@ class TestScopesProtection(BaseTest):
         """
         Test access to a scope protected resource with correct scopes provided
         """
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -159,7 +165,7 @@ class TestScopesProtection(BaseTest):
             "code": authorization_code,
             "redirect_uri": "http://example.org",
         }
-        auth_headers = get_basic_auth_header(self.application.client_id, self.application.client_secret)
+        auth_headers = get_basic_auth_header(self.application.client_id, CLEARTEXT_SECRET)
 
         response = self.client.post(reverse("oauth2_provider:token"), data=token_request_data, **auth_headers)
         content = json.loads(response.content.decode("utf-8"))
@@ -180,6 +186,7 @@ class TestScopesProtection(BaseTest):
         """
         Test access to a scope protected resource with wrong scopes provided
         """
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -201,7 +208,7 @@ class TestScopesProtection(BaseTest):
             "code": authorization_code,
             "redirect_uri": "http://example.org",
         }
-        auth_headers = get_basic_auth_header(self.application.client_id, self.application.client_secret)
+        auth_headers = get_basic_auth_header(self.application.client_id, CLEARTEXT_SECRET)
 
         response = self.client.post(reverse("oauth2_provider:token"), data=token_request_data, **auth_headers)
         content = json.loads(response.content.decode("utf-8"))
@@ -222,6 +229,7 @@ class TestScopesProtection(BaseTest):
         """
         Test access to a multi-scope protected resource with wrong scopes provided
         """
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -243,7 +251,7 @@ class TestScopesProtection(BaseTest):
             "code": authorization_code,
             "redirect_uri": "http://example.org",
         }
-        auth_headers = get_basic_auth_header(self.application.client_id, self.application.client_secret)
+        auth_headers = get_basic_auth_header(self.application.client_id, CLEARTEXT_SECRET)
 
         response = self.client.post(reverse("oauth2_provider:token"), data=token_request_data, **auth_headers)
         content = json.loads(response.content.decode("utf-8"))
@@ -264,6 +272,7 @@ class TestScopesProtection(BaseTest):
         """
         Test access to a multi-scope protected resource with correct scopes provided
         """
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -285,7 +294,7 @@ class TestScopesProtection(BaseTest):
             "code": authorization_code,
             "redirect_uri": "http://example.org",
         }
-        auth_headers = get_basic_auth_header(self.application.client_id, self.application.client_secret)
+        auth_headers = get_basic_auth_header(self.application.client_id, CLEARTEXT_SECRET)
 
         response = self.client.post(reverse("oauth2_provider:token"), data=token_request_data, **auth_headers)
         content = json.loads(response.content.decode("utf-8"))
@@ -305,6 +314,7 @@ class TestScopesProtection(BaseTest):
 
 class TestReadWriteScope(BaseTest):
     def get_access_token(self, scopes):
+        self.oauth2_settings.PKCE_REQUIRED = False
         self.client.login(username="test_user", password="123456")
 
         # retrieve a valid authorization code
@@ -326,7 +336,7 @@ class TestReadWriteScope(BaseTest):
             "code": authorization_code,
             "redirect_uri": "http://example.org",
         }
-        auth_headers = get_basic_auth_header(self.application.client_id, self.application.client_secret)
+        auth_headers = get_basic_auth_header(self.application.client_id, CLEARTEXT_SECRET)
 
         response = self.client.post(reverse("oauth2_provider:token"), data=token_request_data, **auth_headers)
         content = json.loads(response.content.decode("utf-8"))

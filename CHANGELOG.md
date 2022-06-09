@@ -17,11 +17,124 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [unreleased]
 
 ### Added
-* #712, #636, #808. Calls to `django.contrib.auth.authenticate()` now pass a `request`
-  to provide compatibility with backends that need one.
-  
+* Support `prompt=login` for the OIDC Authorization Code Flow end user [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
+* #1163 Adds French translations.
+* #1166 Add spanish (es) translations.
+
+### Changed
+* #1152 `createapplication` management command enhanced to display an auto-generated secret before it gets hashed.
+
+## [2.0.0] 2022-04-24
+
+This is a major release with **BREAKING** changes. Please make sure to review these changes before upgrading:
+
+### Added
+* #1106 OIDC: Add "scopes_supported" to the [ConnectDiscoveryInfoView](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#connectdiscoveryinfoview).
+  This completes the view to provide all the REQUIRED and RECOMMENDED [OpenID Provider Metadata](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderMetadata).
+* #1128 Documentation: [Tutorial](https://django-oauth-toolkit.readthedocs.io/en/latest/tutorial/tutorial_05.html)
+  on using Celery to automate clearing expired tokens.
+
+### Changed
+* #1129 (**Breaking**) Changed default value of PKCE_REQUIRED to True. This is a **breaking change**. Clients without
+  PKCE enabled will fail to authenticate. This breaks with [section 5 of RFC7636](https://datatracker.ietf.org/doc/html/rfc7636)
+  in favor of the [OAuth2 Security Best Practices for Authorization Code Grants](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics#section-2.1).
+  If you want to retain the pre-2.x behavior, set `PKCE_REQUIRED = False` in your settings.py
+* #1093 (**Breaking**) Changed to implement [hashed](https://docs.djangoproject.com/en/stable/topics/auth/passwords/)
+  client_secret values. This is a **breaking change** that will migrate all your existing
+  cleartext `application.client_secret` values to be hashed with Django's default password hashing algorithm
+  and can not be reversed. When adding or modifying an Application in the Admin console, you must copy the
+  auto-generated or manually-entered `client_secret` before hitting Save.
+* #1108 OIDC: (**Breaking**) Add default configurable OIDC standard scopes that determine which claims are returned.
+  If you've [customized OIDC responses](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#customizing-the-oidc-responses)
+  and want to retain the pre-2.x behavior, set `oidc_claim_scope = None` in your subclass of `OAuth2Validator`.
+* #1108 OIDC: Make the `access_token` available to `get_oidc_claims` when called from `get_userinfo_claims`.
+* #1132: Added `--algorithm` argument to `createapplication` management command
+
 ### Fixed
-* #524 Restrict usage of timezone aware expire dates to Django projects with USE_TZ set to True.
+* #1108 OIDC: Fix `validate_bearer_token()` to properly set `request.scopes` to the list of granted scopes.
+* #1132: Fixed help text for `--skip-authorization` argument of the `createapplication` management command.
+
+### Removed
+* #1124 (**Breaking**, **Security**) Removes support for insecure `urn:ietf:wg:oauth:2.0:oob` and `urn:ietf:wg:oauth:2.0:oob:auto` which are replaced
+  by [RFC 8252](https://datatracker.ietf.org/doc/html/rfc8252) "OAuth 2.0 for Native Apps" BCP. Google has
+  [deprecated use of oob](https://developers.googleblog.com/2022/02/making-oauth-flows-safer.html?m=1#disallowed-oob) with
+  a final end date of 2022-10-03. If you still rely on oob support in django-oauth-toolkit, do not upgrade to this release.
+
+## [1.7.1] 2022-03-19
+
+### Removed
+* #1126 Reverts #1070 which incorrectly added Celery auto-discovery tasks.py (as described in #1123) and because it conflicts
+  with Huey's auto-discovery which also uses tasks.py as described in #1114. If you are using Celery or Huey, you'll need
+  to separately implement these tasks.
+
+## [1.7.0] 2022-01-23
+
+### Added
+* #969 Add batching of expired token deletions in `cleartokens` management command and `models.clear_expired()`
+  to improve performance for removal of large numers of expired tokens. Configure with
+  [`CLEAR_EXPIRED_TOKENS_BATCH_SIZE`](https://django-oauth-toolkit.readthedocs.io/en/latest/settings.html#clear-expired-tokens-batch-size) and
+  [`CLEAR_EXPIRED_TOKENS_BATCH_INTERVAL`](https://django-oauth-toolkit.readthedocs.io/en/latest/settings.html#clear-expired-tokens-batch-interval).
+* #1070 Add a Celery task for clearing expired tokens, e.g. to be scheduled as a [periodic task](https://docs.celeryproject.org/en/stable/userguide/periodic-tasks.html).
+* #1062 Add Brazilian Portuguese (pt-BR) translations.
+* #1069 OIDC: Add an alternate form of
+  [get_additional_claims()](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#adding-claims-to-the-id-token)
+  which makes the list of additional `claims_supported` available at the OIDC auto-discovery endpoint (`.well-known/openid-configuration`).
+
+### Fixed
+* #1012 Return 200 status code with `{"active": false}` when introspecting a nonexistent token
+  per [RFC 7662](https://datatracker.ietf.org/doc/html/rfc7662#section-2.2). It had been incorrectly returning 401.
+
+## [1.6.3] 2022-01-11
+
+### Fixed
+* #1085 Fix for #1083 admin UI search for idtoken results in `django.core.exceptions.FieldError: Cannot resolve keyword 'token' into field.`
+
+### Added
+* #1085 Add admin UI search fields for additional models.
+
+## [1.6.2] 2022-01-06
+
+**NOTE: This release reverts an inadvertently-added breaking change.**
+
+### Fixed
+
+* #1056 Add missing migration triggered by [Django 4.0 changes to the migrations autodetector](https://docs.djangoproject.com/en/4.0/releases/4.0/#migrations-autodetector-changes).
+* #1068 Revert #967 which incorrectly changed an API. See #1066.
+
+## [1.6.1] 2021-12-23
+
+### Changed
+* Note: Only Django 4.0.1+ is supported due to a regression in Django 4.0.0. [Explanation](https://github.com/jazzband/django-oauth-toolkit/pull/1046#issuecomment-998015272)
+
+### Fixed
+* Miscellaneous 1.6.0 packaging issues.
+
+## [1.6.0] 2021-12-19
+### Added
+* #949 Provide django.contrib.auth.authenticate() with a `request` for compatibiity with more backends (like django-axes).
+* #968, #1039 Add support for Django 3.2 and 4.0.
+* #953 Allow loopback redirect URIs using random ports as described in [RFC8252 section 7.3](https://datatracker.ietf.org/doc/html/rfc8252#section-7.3).
+* #972 Add Farsi/fa language support.
+* #978 OIDC: Add support for [rotating multiple RSA private keys](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#rotating-the-rsa-private-key).
+* #978 OIDC: Add new [OIDC_JWKS_MAX_AGE_SECONDS](https://django-oauth-toolkit.readthedocs.io/en/latest/settings.html#oidc-jwks-max-age-seconds) to improve `jwks_uri` caching.
+* #967 OIDC: Add [additional claims](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#adding-claims-to-the-id-token) beyond `sub` to the id_token.
+* #1041 Add a search field to the Admin UI (e.g. for search for tokens by email address).
+
+### Changed
+* #981 Require redirect_uri if multiple URIs are registered per [RFC6749 section 3.1.2.3](https://datatracker.ietf.org/doc/html/rfc6749#section-3.1.2.3)
+* #991 Update documentation of [REFRESH_TOKEN_EXPIRE_SECONDS](https://django-oauth-toolkit.readthedocs.io/en/latest/settings.html#refresh-token-expire-seconds) to indicate it may be `int` or `datetime.timedelta`.
+* #977 Update [Tutorial](https://django-oauth-toolkit.readthedocs.io/en/stable/tutorial/tutorial_01.html#) to show required `include`.
+
+### Removed
+* #968 Remove support for Django 3.0 & 3.1 and Python 3.6
+* #1035 Removes default_app_config for Django Deprecation Warning
+* #1023 six should be dropped
+
+### Fixed
+* #963 Fix handling invalid hex values in client query strings with a 400 error rather than 500.
+* #973 [Tutorial](https://django-oauth-toolkit.readthedocs.io/en/latest/tutorial/tutorial_01.html#start-your-app) updated to use `django-cors-headers`.
+* #956 OIDC: Update documentation of [get_userinfo_claims](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#adding-information-to-the-userinfo-service) to add the missing argument.
+
 
 ## [1.5.0] 2021-03-18
 

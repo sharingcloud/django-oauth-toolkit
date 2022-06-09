@@ -72,6 +72,8 @@ DEFAULTS = {
     "OIDC_ISS_ENDPOINT": "",
     "OIDC_USERINFO_ENDPOINT": "",
     "OIDC_RSA_PRIVATE_KEY": "",
+    "OIDC_RSA_PRIVATE_KEYS_INACTIVE": [],
+    "OIDC_JWKS_MAX_AGE_SECONDS": 3600,
     "OIDC_RESPONSE_TYPES_SUPPORTED": [
         "code",
         "token",
@@ -95,10 +97,12 @@ DEFAULTS = {
     "RESOURCE_SERVER_INTROSPECTION_CREDENTIALS": None,
     "RESOURCE_SERVER_TOKEN_CACHING_SECONDS": 36000,
     # Whether or not PKCE is required
-    "PKCE_REQUIRED": False,
+    "PKCE_REQUIRED": True,
     # Whether to re-create OAuthlibCore on every request.
     # Should only be required in testing.
     "ALWAYS_RELOAD_OAUTHLIB_CORE": False,
+    "CLEAR_EXPIRED_TOKENS_BATCH_SIZE": 10000,
+    "CLEAR_EXPIRED_TOKENS_BATCH_INTERVAL": 0,
 }
 
 # List of settings that cannot be empty

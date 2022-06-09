@@ -15,6 +15,7 @@ from oauth2_provider.oauth2_backends import get_oauthlib_core
 from oauth2_provider.oauth2_validators import OAuth2Validator
 
 from . import presets
+from .utils import get_basic_auth_header
 
 
 try:
@@ -27,6 +28,8 @@ UserModel = get_user_model()
 Application = get_application_model()
 AccessToken = get_access_token_model()
 RefreshToken = get_refresh_token_model()
+
+CLEARTEXT_SECRET = "1234567890abcdefghijklmnopqrstuvwxyz"
 
 
 @contextlib.contextmanager
@@ -51,7 +54,7 @@ class TestOAuth2Validator(TransactionTestCase):
         self.validator = OAuth2Validator()
         self.application = Application.objects.create(
             client_id="client_id",
-            client_secret="client_secret",
+            client_secret=CLEARTEXT_SECRET,
             user=self.user,
             client_type=Application.CLIENT_PUBLIC,
             authorization_grant_type=Application.GRANT_PASSWORD,
@@ -69,7 +72,7 @@ class TestOAuth2Validator(TransactionTestCase):
         self.request.client_secret = "wrong_client_secret"
         self.assertFalse(self.validator._authenticate_request_body(self.request))
 
-        self.request.client_secret = "client_secret"
+        self.request.client_secret = CLEARTEXT_SECRET
         self.assertTrue(self.validator._authenticate_request_body(self.request))
 
     def test_extract_basic_auth(self):
@@ -86,26 +89,22 @@ class TestOAuth2Validator(TransactionTestCase):
 
     def test_authenticate_basic_auth(self):
         self.request.encoding = "utf-8"
-        # client_id:client_secret
-        self.request.headers = {"HTTP_AUTHORIZATION": "Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=\n"}
+        self.request.headers = get_basic_auth_header("client_id", CLEARTEXT_SECRET)
         self.assertTrue(self.validator._authenticate_basic_auth(self.request))
 
     def test_authenticate_basic_auth_default_encoding(self):
         self.request.encoding = None
-        # client_id:client_secret
-        self.request.headers = {"HTTP_AUTHORIZATION": "Basic Y2xpZW50X2lkOmNsaWVudF9zZWNyZXQ=\n"}
+        self.request.headers = get_basic_auth_header("client_id", CLEARTEXT_SECRET)
         self.assertTrue(self.validator._authenticate_basic_auth(self.request))
 
     def test_authenticate_basic_auth_wrong_client_id(self):
         self.request.encoding = "utf-8"
-        # wrong_id:client_secret
-        self.request.headers = {"HTTP_AUTHORIZATION": "Basic d3JvbmdfaWQ6Y2xpZW50X3NlY3JldA==\n"}
+        self.request.headers = get_basic_auth_header("wrong_id", CLEARTEXT_SECRET)
         self.assertFalse(self.validator._authenticate_basic_auth(self.request))
 
     def test_authenticate_basic_auth_wrong_client_secret(self):
         self.request.encoding = "utf-8"
-        # client_id:wrong_secret
-        self.request.headers = {"HTTP_AUTHORIZATION": "Basic Y2xpZW50X2lkOndyb25nX3NlY3JldA==\n"}
+        self.request.headers = get_basic_auth_header("client_id", "wrong_secret")
         self.assertFalse(self.validator._authenticate_basic_auth(self.request))
 
     def test_authenticate_basic_auth_not_b64_auth_string(self):
@@ -116,7 +115,6 @@ class TestOAuth2Validator(TransactionTestCase):
 
     def test_authenticate_basic_auth_invalid_b64_string(self):
         self.request.encoding = "utf-8"
-        # client_id:wrong_secret
         self.request.headers = {"HTTP_AUTHORIZATION": "Basic ZHVtbXk=:ZHVtbXk=\n"}
         self.assertFalse(self.validator._authenticate_basic_auth(self.request))
 
@@ -140,7 +138,7 @@ class TestOAuth2Validator(TransactionTestCase):
         self.assertTrue(self.validator.client_authentication_required(self.request))
         self.request.headers = {}
         self.request.client_id = "client_id"
-        self.request.client_secret = "client_secret"
+        self.request.client_secret = CLEARTEXT_SECRET
         self.assertTrue(self.validator.client_authentication_required(self.request))
         self.request.client_secret = ""
         self.assertFalse(self.validator.client_authentication_required(self.request))
@@ -327,7 +325,7 @@ class TestOAuth2ValidatorProvidesErrorData(TransactionTestCase):
         self.validator = OAuth2Validator()
         self.application = Application.objects.create(
             client_id="client_id",
-            client_secret="client_secret",
+            client_secret=CLEARTEXT_SECRET,
             user=self.user,
             client_type=Application.CLIENT_PUBLIC,
             authorization_grant_type=Application.GRANT_PASSWORD,
@@ -455,7 +453,7 @@ def test_oidc_endpoint_generation(oauth2_settings, rf):
     request = Request("/", headers=django_request.META)
     validator = OAuth2Validator()
     oidc_issuer_endpoint = validator.get_oidc_issuer_endpoint(request)
-    assert oidc_issuer_endpoint == "http://testserver/o"
+    assert oidc_issuer_endpoint == "http://testserver/"
 
 
 @pytest.mark.oauth2_settings(presets.OIDC_SETTINGS_RW)
@@ -464,7 +462,7 @@ def test_oidc_endpoint_generation_ssl(oauth2_settings, rf, settings):
     django_request = rf.get("/", secure=True)
     # Calling the settings method with a django https request should generate a https url
     oidc_issuer_endpoint = oauth2_settings.oidc_issuer(django_request)
-    assert oidc_issuer_endpoint == "https://testserver/o"
+    assert oidc_issuer_endpoint == "https://testserver/"
 
     # Should also work with an oauthlib request (via validator)
     core = get_oauthlib_core()
@@ -472,7 +470,7 @@ def test_oidc_endpoint_generation_ssl(oauth2_settings, rf, settings):
     request = Request(uri=uri, http_method=http_method, body=body, headers=headers)
     validator = OAuth2Validator()
     oidc_issuer_endpoint = validator.get_oidc_issuer_endpoint(request)
-    assert oidc_issuer_endpoint == "https://testserver/o"
+    assert oidc_issuer_endpoint == "https://testserver/"
 
 
 @pytest.mark.oauth2_settings(presets.OIDC_SETTINGS_RW)

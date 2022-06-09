@@ -157,7 +157,7 @@ def test_generating_iss_endpoint(oauth2_settings, issuer_setting, request_type, 
         request = rf.get("/")
     elif request_type == "oauthlib":
         request = Request("/", headers=rf.get("/").META)
-    expected = issuer_setting or "http://testserver/o"
+    expected = issuer_setting or "http://testserver/"
     assert oauth2_settings.oidc_issuer(request) == expected
 
 
@@ -167,3 +167,8 @@ def test_generating_iss_endpoint_type_error(oauth2_settings):
     with pytest.raises(TypeError) as exc:
         oauth2_settings.oidc_issuer(None)
     assert str(exc.value) == "request must be a django or oauthlib request: got None"
+
+
+def test_pkce_required_is_default():
+    settings = OAuth2ProviderSettings()
+    assert settings.PKCE_REQUIRED is True
