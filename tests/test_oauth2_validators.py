@@ -453,7 +453,7 @@ def test_oidc_endpoint_generation(oauth2_settings, rf):
     request = Request("/", headers=django_request.META)
     validator = OAuth2Validator()
     oidc_issuer_endpoint = validator.get_oidc_issuer_endpoint(request)
-    assert oidc_issuer_endpoint == "http://testserver/o"
+    assert oidc_issuer_endpoint == "http://testserver/"
 
 
 @pytest.mark.oauth2_settings(presets.OIDC_SETTINGS_RW)
@@ -462,7 +462,7 @@ def test_oidc_endpoint_generation_ssl(oauth2_settings, rf, settings):
     django_request = rf.get("/", secure=True)
     # Calling the settings method with a django https request should generate a https url
     oidc_issuer_endpoint = oauth2_settings.oidc_issuer(django_request)
-    assert oidc_issuer_endpoint == "https://testserver/o"
+    assert oidc_issuer_endpoint == "https://testserver/"
 
     # Should also work with an oauthlib request (via validator)
     core = get_oauthlib_core()
@@ -470,7 +470,7 @@ def test_oidc_endpoint_generation_ssl(oauth2_settings, rf, settings):
     request = Request(uri=uri, http_method=http_method, body=body, headers=headers)
     validator = OAuth2Validator()
     oidc_issuer_endpoint = validator.get_oidc_issuer_endpoint(request)
-    assert oidc_issuer_endpoint == "https://testserver/o"
+    assert oidc_issuer_endpoint == "https://testserver/"
 
 
 @pytest.mark.oauth2_settings(presets.OIDC_SETTINGS_RW)

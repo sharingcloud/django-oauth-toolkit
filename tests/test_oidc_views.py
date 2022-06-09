@@ -15,6 +15,7 @@ class TestConnectDiscoveryInfoView(TestCase):
             "issuer": "http://localhost/o",
             "authorization_endpoint": "http://localhost/o/authorize/",
             "token_endpoint": "http://localhost/o/token/",
+            "end_session_endpoint": "http://localhost/o/logout/",
             "userinfo_endpoint": "http://localhost/o/userinfo/",
             "jwks_uri": "http://localhost/o/.well-known/jwks.json",
             "scopes_supported": ["read", "write", "openid"],
@@ -40,9 +41,10 @@ class TestConnectDiscoveryInfoView(TestCase):
         self.oauth2_settings.OIDC_ISS_ENDPOINT = None
         self.oauth2_settings.OIDC_USERINFO_ENDPOINT = None
         expected_response = {
-            "issuer": "http://testserver/o",
+            "issuer": "http://testserver/",
             "authorization_endpoint": "http://testserver/o/authorize/",
             "token_endpoint": "http://testserver/o/token/",
+            "end_session_endpoint": "http://testserver/o/logout/",
             "userinfo_endpoint": "http://testserver/o/userinfo/",
             "jwks_uri": "http://testserver/o/.well-known/jwks.json",
             "scopes_supported": ["read", "write", "openid"],

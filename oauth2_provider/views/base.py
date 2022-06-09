@@ -1,6 +1,6 @@
 import json
 import logging
-from urllib.parse import parse_qsl, urlencode, urlparse, unquote, ParseResult
+from urllib.parse import ParseResult, parse_qsl, unquote, urlencode, urlparse
 
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -22,6 +22,7 @@ from ..scopes import get_scopes_backend
 from ..settings import oauth2_settings
 from ..signals import app_authorized, oidc_session_ended
 from .mixins import OAuthLibMixin
+
 
 log = logging.getLogger("oauth2_provider")
 

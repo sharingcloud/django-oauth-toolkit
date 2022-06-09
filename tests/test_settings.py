@@ -157,7 +157,7 @@ def test_generating_iss_endpoint(oauth2_settings, issuer_setting, request_type, 
         request = rf.get("/")
     elif request_type == "oauthlib":
         request = Request("/", headers=rf.get("/").META)
-    expected = issuer_setting or "http://testserver/o"
+    expected = issuer_setting or "http://testserver/"
     assert oauth2_settings.oidc_issuer(request) == expected
 
 
