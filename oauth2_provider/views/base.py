@@ -3,8 +3,8 @@ import logging
 from urllib.parse import ParseResult, parse_qsl, unquote, urlencode, urlparse
 
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.contrib.auth.views import redirect_to_login
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
 from django.shortcuts import redirect, resolve_url
@@ -17,7 +17,12 @@ from django.views.generic import FormView, View
 from ..exceptions import OAuthToolkitError
 from ..forms import AllowForm
 from ..http import OAuth2ResponseRedirect
-from ..models import get_access_token_model, get_application_model, get_id_token_model, get_refresh_token_model
+from ..models import (
+    get_access_token_model,
+    get_application_model,
+    get_id_token_model,
+    get_refresh_token_model,
+)
 from ..oauth2_validators import OAuth2Validator
 from ..scopes import get_scopes_backend
 from ..settings import oauth2_settings
