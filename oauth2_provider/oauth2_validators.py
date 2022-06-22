@@ -884,6 +884,17 @@ class OAuth2Validator(RequestValidator):
         except (JWException, JWTExpired, IDToken.DoesNotExist):
             return None
 
+    def get_sub_and_jti_from_id_token_hint(self, token):
+        key = self._get_key_for_token(token)
+        if not key:
+            return None, None
+        try:
+            jwt_token = jwt.JWT(key=key, jwt=token, check_claims={})
+            claims = json.loads(jwt_token.claims)
+            return (claims["sub"], claims["jti"])
+        except (JWException, KeyError):
+            return None, None
+
     def _get_key_for_token(self, token):
         """
         Peek at the unvalidated token to discover who it was issued for
