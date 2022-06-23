@@ -4,6 +4,7 @@ from urllib.parse import ParseResult, parse_qsl, unquote, urlencode, urlparse
 
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.contrib.auth.views import redirect_to_login
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseNotFound
 from django.shortcuts import redirect, resolve_url
@@ -16,7 +17,12 @@ from django.views.generic import FormView, View
 from ..exceptions import OAuthToolkitError
 from ..forms import AllowForm
 from ..http import OAuth2ResponseRedirect
-from ..models import get_access_token_model, get_application_model, get_refresh_token_model
+from ..models import (
+    get_access_token_model,
+    get_application_model,
+    get_id_token_model,
+    get_refresh_token_model,
+)
 from ..oauth2_validators import OAuth2Validator
 from ..scopes import get_scopes_backend
 from ..settings import oauth2_settings
@@ -296,7 +302,6 @@ class EndSessionView(OAuthLibMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-
         redirect_uri = request.GET.get("post_logout_redirect_uri", None)
         state = request.GET.get("state", None)
         # we'll receive an access token
@@ -304,13 +309,18 @@ class EndSessionView(OAuthLibMixin, View):
         if not token_hint:
             return HttpResponseBadRequest("missing id_token_hint")
 
-        id_token = OAuth2Validator()._load_id_token(token_hint)
-        if not id_token:
+        sub, jti = OAuth2Validator().get_sub_and_jti_from_id_token_hint(token_hint)
+        if not sub:
             return HttpResponseNotFound("id_token_hint not found")
 
-        user = id_token.user or request.user
-        self.revoke_tokens(user, id_token)
-        oidc_session_ended.send(sender=self, request=request, id_token=id_token)
+        try:
+            user = User.objects.get(id=sub)
+        except User.DoesNotExist:
+            return HttpResponseNotFound("id_token_hint not found")
+
+        self.revoke_user_tokens(user)
+        oidc_session_ended.send(sender=self, request=request, user=user)
+        get_id_token_model().objects.filter(jti=jti).delete()
 
         # state is an opaque value that will be passed as-is to the RP when
         # redirecting user to the post logout redirect URI. If redirect URI
@@ -323,8 +333,8 @@ class EndSessionView(OAuthLibMixin, View):
         # else redirect to login url
         return redirect(settings.LOGIN_URL)
 
-    def revoke_tokens(self, user, id_token):
-        access_tokens = get_access_token_model().objects.filter(user=user, id_token=id_token)
+    def revoke_user_tokens(self, user):
+        access_tokens = get_access_token_model().objects.filter(user=user)
         refresh_tokens = get_refresh_token_model().objects.filter(access_token__in=access_tokens)
 
         removed_refresh_tokens_count = refresh_tokens.delete()
@@ -332,8 +342,6 @@ class EndSessionView(OAuthLibMixin, View):
 
         removed_access_tokens_count = access_tokens.delete()
         log.info("%s accesss tokens revoked", removed_access_tokens_count)
-
-        id_token.delete()
 
     def add_url_params(url, params):
         """
